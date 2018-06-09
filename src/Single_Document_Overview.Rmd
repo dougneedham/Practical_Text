@@ -4,20 +4,26 @@ output: html_notebook
 ---
 
 ```{r load_packages}
-suppressPackageStartupMessages(library(pdftools)) # for reading PDF files
-suppressPackageStartupMessages(library(udpipe))   # For nlp
-suppressPackageStartupMessages(library(quanteda)) # for text_readability 
-suppressPackageStartupMessages(library(lattice))  # for graphics
-suppressPackageStartupMessages(library("ggplot2")) # for viz
-suppressPackageStartupMessages(library(syuzhet))  # For Sentiment 
+suppressPackageStartupMessages(library("ggplot2")) # For viz
+suppressPackageStartupMessages(library(pdftools))  # for reading PDF files
+suppressPackageStartupMessages(library(lattice))   # for some graphics
+suppressPackageStartupMessages(library(quanteda))  # for text_readability 
+suppressPackageStartupMessages(library(syuzhet))   # For Sentiment 
+suppressPackageStartupMessages(library(tictoc))    # For Timing
+suppressPackageStartupMessages(library(udpipe))    # For nlp
+
+
+
 ```
 
 ```{r read_data }
+tic()
 
 filename <- '../PDF_Input/Calculus.pdf'
 text <- pdf_text(filename)
 
 udmodel_english <- udpipe_load_model(file = '../udpipe/english-ud-2.0-170801.udpipe')
+toc()
 ```
 ```{r}
  normalit<-function(m){
@@ -26,16 +32,17 @@ udmodel_english <- udpipe_load_model(file = '../udpipe/english-ud-2.0-170801.udp
 ```
 
 ```{r make_sections}
+tic()
 section_size <- floor(length(text)/5)
 final_bit <- length(text)-(section_size*5)
 doc_id_text <- c(rep("Section 01",section_size),rep("Section 02",section_size) ,rep("Section 03",section_size),rep("Section 04",section_size),rep("Section 05",section_size+final_bit))
 
 raw.df <- data.frame(doc_id=doc_id_text,raw_text=text,stringsAsFactors = FALSE)
-
+toc()
 ```
 
 ```{r readability}
-
+tic()
 tr.df <- textstat_readability(corpus(raw.df,docid_field="doc_id",text_field="raw_text"))
 
 spl <- strsplit(as.character(tr.df$document), "\\.")
@@ -44,9 +51,11 @@ tr.df$subsection <- sapply(lapply(spl,tail,-1),paste,collapse="\\.")
 boxplot(normalit(Flesch.Kincaid)~section,data=tr.df,main="Reading level by Section ")
 #tr.df$section <- unlist(str_split(tr.df$document, "\\."))[1]
 boxplot(normalit(Flesch.Kincaid)~section,data=tr.df[tr.df$section %in% c("Section 01","Section 02","Section 03","Section 04")],main="Reading level by Section ")
+toc()
 ```
 
 ```{r Sentiment}
+tic()
 Sentiment <- get_nrc_sentiment(raw.df$raw_text)
 
 
@@ -82,18 +91,22 @@ for(doc_id in sort(unique(sentiment.df$section_id))) {
   ggtitle(paste0("Doug's book Collectoin Overall sentiment analysis for ",doc_id)))
   
 
-  }
+}
+toc()
 ```
 
 
 
-```{r}
+```{r annotate text}
+tic()
 ann.raw <- udpipe_annotate(udmodel_english,text,doc_id=paste(filename,doc_id_text,sep=" "))
 
 ann.df <- data.frame(ann.raw)
+toc()
 ```
 
-```{r}
+```{r display word frequencies}
+tic()
 tmp.df <- ann.df
 
 rake_keywords <- keywords_rake(tmp.df, 
@@ -155,5 +168,6 @@ for(doc in unique(ann.df$doc_id)) {
                  main = paste0("Keywords - simple noun phrases ",doc), 
                  xlab = "Frequency"))
 }
+toc()
 ```
 
