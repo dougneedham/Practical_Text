@@ -1,0 +1,159 @@
+---
+title: "Practical Text Analysis for the Data Professional"
+output: html_notebook
+---
+
+```{r load_packages}
+suppressPackageStartupMessages(library(pdftools)) # for reading PDF files
+suppressPackageStartupMessages(library(udpipe))   # For nlp
+suppressPackageStartupMessages(library(quanteda)) # for text_readability 
+suppressPackageStartupMessages(library(lattice))  # for graphics
+suppressPackageStartupMessages(library("ggplot2")) # for viz
+suppressPackageStartupMessages(library(syuzhet))  # For Sentiment 
+```
+
+```{r read_data }
+
+filename <- '../PDF_Input/Calculus.pdf'
+text <- pdf_text(filename)
+
+udmodel_english <- udpipe_load_model(file = '../udpipe/english-ud-2.0-170801.udpipe')
+```
+```{r}
+ normalit<-function(m){
+   (m - min(m,na.rm=TRUE))/(max(m,na.rm=TRUE)-min(m,na.rm=TRUE))
+ }
+```
+
+```{r make_sections}
+section_size <- floor(length(text)/5)
+final_bit <- length(text)-(section_size*5)
+doc_id_text <- c(rep("Section 01",section_size),rep("Section 02",section_size) ,rep("Section 03",section_size),rep("Section 04",section_size),rep("Section 05",section_size+final_bit))
+
+raw.df <- data.frame(doc_id=doc_id_text,raw_text=text,stringsAsFactors = FALSE)
+
+```
+
+```{r readability}
+
+tr.df <- textstat_readability(corpus(raw.df,docid_field="doc_id",text_field="raw_text"))
+
+spl <- strsplit(as.character(tr.df$document), "\\.")
+tr.df$section <- sapply(lapply(spl,head,-1),paste,collapse="\\.")
+tr.df$subsection <- sapply(lapply(spl,tail,-1),paste,collapse="\\.")
+boxplot(normalit(Flesch.Kincaid)~section,data=tr.df,main="Reading level by Section ")
+#tr.df$section <- unlist(str_split(tr.df$document, "\\."))[1]
+boxplot(normalit(Flesch.Kincaid)~section,data=tr.df[tr.df$section %in% c("Section 01","Section 02","Section 03","Section 04")],main="Reading level by Section ")
+```
+
+```{r Sentiment}
+Sentiment <- get_nrc_sentiment(raw.df$raw_text)
+
+
+
+sentiment.df <- data.frame(section_id=doc_id_text,Sentiment,stringsAsFactors = FALSE)
+
+td<-data.frame(t(Sentiment))
+td_Rowsum <- data.frame(rowSums(td[2:length(td)])) 
+
+#Transformation and  cleaning
+
+names(td_Rowsum)[1] <- "count"
+td_Rowsum <- cbind("sentiment" = rownames(td_Rowsum), td_Rowsum)
+rownames(td_Rowsum) <- NULL
+td_Plot<-td_Rowsum[1:10,]
+
+
+qplot(sentiment, data=td_Plot, weight=count, geom="bar",fill=sentiment)+
+  ggtitle("Doug's book Collectoin Overall sentiment analysis")
+
+for(doc_id in sort(unique(sentiment.df$section_id))) { 
+  tmp.df <- sentiment.df[doc_id == sentiment.df$section_id,]
+  td<-data.frame(t( tmp.df[,c(2:11)]))
+  td_Rowsum <- data.frame(rowSums(td[2:length(td)])) 
+  
+  #Transformation and  cleaning
+  
+  names(td_Rowsum)[1] <- "count"
+  td_Rowsum <- cbind("sentiment" = rownames(td_Rowsum), td_Rowsum)
+  rownames(td_Rowsum) <- NULL
+  td_Plot<-td_Rowsum[1:10,]
+  print(qplot(sentiment, data=td_Plot, weight=count, geom="bar",fill=sentiment)+
+  ggtitle(paste0("Doug's book Collectoin Overall sentiment analysis for ",doc_id)))
+  
+
+  }
+```
+
+
+
+```{r}
+ann.raw <- udpipe_annotate(udmodel_english,text,doc_id=paste(filename,doc_id_text,sep=" "))
+
+ann.df <- data.frame(ann.raw)
+```
+
+```{r}
+tmp.df <- ann.df
+
+rake_keywords <- keywords_rake(tmp.df, 
+                               term = "lemma", 
+                               group = "doc_id",
+                               relevant = tmp.df$upos %in% c("NOUN", "ADJ")
+                               )
+rake_keywords$key <- factor(rake_keywords$keyword, levels = rev(rake_keywords$keyword))
+print(barchart(key ~ rake, 
+               data = head(subset(rake_keywords, freq > 3), 20), 
+               col = "blue", 
+               main = "Keywords identified by RAKE ",
+               xlab = "Rake"))
+
+tmp.df$phrase_tag <- as_phrasemachine(tmp.df$upos,
+                                      type = "upos")
+phrases <- keywords_phrases(x = tmp.df$phrase_tag,
+                            term = tmp.df$token, 
+                            pattern = "(A|N)*N(P+D*(A|N)*N)*", 
+                            is_regex = TRUE,
+                            detailed = FALSE)
+
+phrases <- subset(phrases, ngram > 1 & freq > 3)
+
+phrases$key <- factor(phrases$keyword,
+                      levels = rev(phrases$keyword))
+print(barchart(key ~ freq, 
+               data = head(phrases, 20), 
+               col = "green", 
+               main = "Keywords - simple noun phrases ", 
+               xlab = "Frequency keywords"))
+
+
+for(doc in unique(ann.df$doc_id)) { 
+  tmp.df <- ann.df[ann.df$doc_id==doc,]
+  rake_keywords <- keywords_rake(tmp.df , 
+                                 term = "lemma", 
+                                 group = "doc_id", 
+                                 relevant = tmp.df$upos %in% c("NOUN", "ADJ")
+                                 )
+  rake_keywords$key <- factor(rake_keywords$keyword, levels = rev(rake_keywords$keyword))
+  print(barchart(key ~ rake, 
+                 data = head(subset(rake_keywords, freq > 3), 20), 
+                 col = "blue", 
+                 main = paste0("Keywords identified by RAKE ",doc), 
+                 xlab = "Rake Keyword"))
+  
+  tmp.df$phrase_tag <- as_phrasemachine(tmp.df$upos, type = "upos")
+  phrases <- keywords_phrases(x = tmp.df$phrase_tag, 
+                              term = tmp.df$token, 
+                              pattern = "(A|N)*N(P+D*(A|N)*N)*", 
+                              is_regex = TRUE, 
+                              detailed = FALSE)
+  phrases <- subset(phrases, ngram > 1 & freq > 3)
+  phrases$key <- factor(phrases$keyword, levels = rev(phrases$keyword))
+  print(barchart(key ~ freq, 
+                 data = head(phrases, 20), 
+                 col = "Green", 
+                 main = paste0("Keywords - simple noun phrases ",doc), 
+                 xlab = "Frequency"))
+}
+```
+
