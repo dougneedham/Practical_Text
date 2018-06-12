@@ -2,8 +2,15 @@
 title: "Practical Text Analysis for the Data Professional"
 output: html_notebook
 ---
+# Demonstration Code for analysis of PDF documents. 
 
-```{r load_packages}
+Demonstration code for extracting metrics from PDF files. 
+
+This is for a single document, similar code will be used to process an entire directory. <br>
+
+For more details on how this notebook works, please see [Practical_Text](http://bit.ly/Practical_Text_Blog){target="_blank"}
+
+```{r Load Packages}
 suppressPackageStartupMessages(library("ggplot2")) # For viz
 suppressPackageStartupMessages(library(pdftools))  # for reading PDF files
 suppressPackageStartupMessages(library(lattice))   # for some graphics
@@ -12,11 +19,9 @@ suppressPackageStartupMessages(library(syuzhet))   # For Sentiment
 suppressPackageStartupMessages(library(tictoc))    # For Timing
 suppressPackageStartupMessages(library(udpipe))    # For nlp
 
-
-
 ```
 
-```{r read_data }
+```{r Read Data }
 tic()
 
 filename <- '../PDF_Input/Calculus.pdf'
@@ -25,13 +30,13 @@ text <- pdf_text(filename)
 udmodel_english <- udpipe_load_model(file = '../udpipe/english-ud-2.0-170801.udpipe')
 toc()
 ```
-```{r}
+```{r Define a function for later use }
  normalit<-function(m){
    (m - min(m,na.rm=TRUE))/(max(m,na.rm=TRUE)-min(m,na.rm=TRUE))
  }
 ```
 
-```{r make_sections}
+```{r Make Sections}
 tic()
 section_size <- floor(length(text)/5)
 final_bit <- length(text)-(section_size*5)
@@ -41,40 +46,47 @@ raw.df <- data.frame(doc_id=doc_id_text,raw_text=text,stringsAsFactors = FALSE)
 toc()
 ```
 
-```{r readability}
+```{r Create Readability Data Frame}
 tic()
 tr.df <- textstat_readability(corpus(raw.df,docid_field="doc_id",text_field="raw_text"))
 
 spl <- strsplit(as.character(tr.df$document), "\\.")
 tr.df$section <- sapply(lapply(spl,head,-1),paste,collapse="\\.")
 tr.df$subsection <- sapply(lapply(spl,tail,-1),paste,collapse="\\.")
+toc()
+```
+
+```{r display boxplot for Readability Data Frame}
+tic()
 boxplot(normalit(Flesch.Kincaid)~section,data=tr.df,main="Reading level by Section ")
-#tr.df$section <- unlist(str_split(tr.df$document, "\\."))[1]
+
 boxplot(normalit(Flesch.Kincaid)~section,data=tr.df[tr.df$section %in% c("Section 01","Section 02","Section 03","Section 04")],main="Reading level by Section ")
 toc()
 ```
 
-```{r Sentiment}
+```{r Create Sentiment Data Frame }
 tic()
 Sentiment <- get_nrc_sentiment(raw.df$raw_text)
 
 
 
 sentiment.df <- data.frame(section_id=doc_id_text,Sentiment,stringsAsFactors = FALSE)
-
+toc()
+```
+```{r Display Sentiment Data Frame}
+tic()
+#Transformation and  cleaning
 td<-data.frame(t(Sentiment))
 td_Rowsum <- data.frame(rowSums(td[2:length(td)])) 
-
-#Transformation and  cleaning
 
 names(td_Rowsum)[1] <- "count"
 td_Rowsum <- cbind("sentiment" = rownames(td_Rowsum), td_Rowsum)
 rownames(td_Rowsum) <- NULL
 td_Plot<-td_Rowsum[1:10,]
-
+levels(td_Plot$sentiment) <- c("anger","anticipation","disgust","fear","joy","sadness","surprise","trust","negative","positive" )
 
 qplot(sentiment, data=td_Plot, weight=count, geom="bar",fill=sentiment)+
-  ggtitle("Doug's book Collectoin Overall sentiment analysis")
+  ggtitle("Doug's book Collection Overall sentiment analysis")
 
 for(doc_id in sort(unique(sentiment.df$section_id))) { 
   tmp.df <- sentiment.df[doc_id == sentiment.df$section_id,]
@@ -87,8 +99,9 @@ for(doc_id in sort(unique(sentiment.df$section_id))) {
   td_Rowsum <- cbind("sentiment" = rownames(td_Rowsum), td_Rowsum)
   rownames(td_Rowsum) <- NULL
   td_Plot<-td_Rowsum[1:10,]
+  levels(td_Plot$sentiment) <- c("anger","anticipation","disgust","fear","joy","sadness","surprise","trust","negative","positive" )
   print(qplot(sentiment, data=td_Plot, weight=count, geom="bar",fill=sentiment)+
-  ggtitle(paste0("Doug's book Collectoin Overall sentiment analysis for ",doc_id)))
+  ggtitle(paste0("Doug's book Collection Overall sentiment analysis for ",doc_id)))
   
 
 }
@@ -97,7 +110,7 @@ toc()
 
 
 
-```{r annotate text}
+```{r Create Annotated Data Frame }
 tic()
 ann.raw <- udpipe_annotate(udmodel_english,text,doc_id=paste(filename,doc_id_text,sep=" "))
 
@@ -105,7 +118,7 @@ ann.df <- data.frame(ann.raw)
 toc()
 ```
 
-```{r display word frequencies}
+```{r Display Word Frequencies}
 tic()
 tmp.df <- ann.df
 

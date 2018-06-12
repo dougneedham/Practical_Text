@@ -110,11 +110,29 @@ for(file in filelist.ls) {
   
 }
 tr_final.df        <- rbindlist(tr_total.ls)
+names(tr_final.df)[1] <- "section_subsection"
+names(tr_final.df)[49] <- "section_id"
+
+tr_final.df <- separate(tr_final.df,section_id,into=c("document","section","id"),sep=" ")
+tr_final.df$section <- paste(tr_final.df$section,tr_final.df$id,sep=" ")
+#tr_final.df$section <- apply(tr_final.df[49],2,function(x) paste(strsplit(x," ")[[1]][2],strsplit(x," ")[[1]][3],sep= " "))
 sentiment_final.df <- rbindlist(sentiment_total.ls)
 noun.df            <- rbindlist(noun.ls)
+
+noun.df <- separate(noun.df,doc_id,into=c("document","section","id"),sep=" ")
+noun.df$section <- paste(noun.df$section,noun.df$id,sep=" ")
+
 adj.df             <- rbindlist(adj.ls)
+
+adj.df <- separate(adj.df,doc_id,into=c("document","section","id"),sep=" ")
+adj.df$section <- paste(adj.df$section,adj.df$id,sep=" ")
+
 verb.df            <- rbindlist(verb.ls)
+verb.df <- separate(verb.df,doc_id,into=c("document","section","id"),sep=" ")
+verb.df$section <- paste(verb.df$section,verb.df$id,sep=" ")
 rake.df            <- rbindlist(rake.ls)
+rake.df <- separate(rake.df,doc_id,into=c("document","section","id"),sep=" ")
+rake.df$section <- paste(rake.df$section,rake.df$id,sep=" ")
 
 noun.df <- noun.df[grep("[:print:]",noun.df$key),]
 adj.df  <-  adj.df[grep("[:print:]",adj.df$key),]
@@ -136,18 +154,6 @@ noun_graph.df <-
 
 noun_graph.df <- noun_graph.df[noun_graph.df$source!=noun_graph.df$target,]
 
-#noun_graph.df$index <- paste(noun_graph.df$source,noun_graph.df$target,sep=" ")
-
-#noun_graph.df$index <- apply(noun_graph.df[4],2,index_string)
-
-# index_string <- function(x) {paste0(sort(unlist(strsplit(as.character(x), " ",fixed=TRUE)[[1]])),collapse="") }
-# noun_graph.df$index <- sapply(noun_graph.df$index, function (x) paste(sort(unlist(strsplit(as.character(x), " ",fixed=TRUE)[[1]])),sep=" "))
-# 
-# # for(i in 1:nrow(noun_graph.df)) {
-#   noun_graph.df[i,]$index <- paste(sort(unlist(strsplit(noun_graph.df[i,]$index," "))),collapse="")
-# }
-
-#unique_noun_graph.df <- ddply(noun_graph.df,~index+term,summarize,source=min(source),target=min(target))
 
 write_csv(noun_graph.df[,c(2,3,1)],'../Graph_Input/noun_graph.csv')
 
@@ -158,15 +164,6 @@ adj_graph.df <-
 
 adj_graph.df <- adj_graph.df[adj_graph.df$source!=adj_graph.df$target,]
 
-#adj_graph.df$index <- paste(adj_graph.df$source,adj_graph.df$target,sep=" ")
-
-#adj_graph.df$index <- apply(adj_graph.df[4],2,index_string)
-
-# for(i in 1:nrow(adj_graph.df)) {
-#   adj_graph.df[i,]$index <- paste(sort(unlist(strsplit(adj_graph.df[i,]$index," "))),collapse="")
-# }
-
-#unique_adj_graph.df <- ddply(adj_graph.df,~index+term,summarize,source=min(source),target=min(target))
 
 write_csv(adj_graph.df[,c(2,3,1)],'../Graph_Input/adj_graph.csv')
 
@@ -177,12 +174,6 @@ verb_graph.df <-
 
 verb_graph.df <- verb_graph.df[verb_graph.df$source!=verb_graph.df$target,]
 
-# verb_graph.df$index <- paste(verb_graph.df$source,verb_graph.df$target,sep=" ")
-# for(i in 1:nrow(verb_graph.df)) {
-#   verb_graph.df[i,]$index <- paste(sort(unlist(strsplit(verb_graph.df[i,]$index," "))),collapse="")
-# }
-# 
-# unique_verb_graph.df <- ddply(verb_graph.df,~index+term,summarize,source=min(source),target=min(target))
 
 write_csv(verb_graph.df[,c(2,3,1)],'../Graph_Input/verb_graph.csv')
 
@@ -192,13 +183,6 @@ rake_graph.df <-
         ,data.frame(term=rake.df$key,target=rake.df$doc_id,stringsAsFactors = FALSE))
 
 rake_graph.df <- rake_graph.df[rake_graph.df$source!=rake_graph.df$target,]
-
-# rake_graph.df$index <- paste(rake_graph.df$source,rake_graph.df$target,sep=" ")
-# for(i in 1:nrow(rake_graph.df)) {
-#   rake_graph.df[i,]$index <- paste(sort(unlist(strsplit(rake_graph.df[i,]$index," "))),collapse="")
-# }
-# 
-# unique_rake_graph.df <- ddply(rake_graph.df,~index+term,summarize,source=min(source),target=min(target))
 
 write_csv(rake_graph.df[,c(2,3,1)],'../Graph_Input/rake_graph.csv')
 
