@@ -1,6 +1,8 @@
 ---
 title: "Practical Text Analysis for the Data Professional"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 # Demonstration Code for analysis of PDF documents. 
 
@@ -10,7 +12,7 @@ This is for a single document, similar code will be used to process an entire di
 
 For more details on how this notebook works, please see
 
-[Practical_Text](http://bit.ly/Practical_Text_Blog){target="_blank"}
+[Practical_Text](http://bit.ly/Practical_Text_Blog)
 
 ```{r Load Packages}
 suppressPackageStartupMessages(library("ggplot2")) # For viz
