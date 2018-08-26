@@ -9,8 +9,11 @@ suppressPackageStartupMessages(library(data.table)) # For Data Manipulation
 suppressPackageStartupMessages(library(readr))      # For writing data
 suppressPackageStartupMessages(library(stringi))      # For writing data
 suppressPackageStartupMessages(library(stringr))      # For writing data
+
 setwd("~/R/Practical_Text/src")
+
 pathname <- "../PDF_Input/"
+
 filelist.ls <- list.files(path=pathname,pattern="*.pdf")
 filepath.ls <-paste0(pathname,filelist.ls)
 
@@ -31,6 +34,8 @@ noun_counter <- 1
 adj_counter <- 1
 verb_counter <- 1
 rake_counter <- 1
+
+
 for(file in filelist.ls) {
   pathname <- "../PDF_Input/"
   file_to_process <- paste0(pathname,file)
@@ -92,12 +97,16 @@ for(file in filelist.ls) {
 #                         relevant = full_ann.df$upos %in% c("NOUN", "ADJ"))
 #   rake$key <- factor(rake$keyword, levels = rev(rake$keyword))
 # # 
+   
+
    for(rtmp in unique(ann.df$doc_id)) { 
      tmp.df <- ann.df[ann.df$doc_id==rtmp,]
-     tmp.df$phrase_tag <- as_phrasemachine(tmp.df$upos, type = "upos")
-     phrases <- keywords_phrases(x = tmp.df$phrase_tag, term = tmp.df$token, 
-                               pattern = "(A|N)*N(P+D*(A|N)*N)*", 
-                               is_regex = TRUE, detailed = FALSE)
+  #   tmp.df$phrase_tag <- as_phrasemachine(tmp.df$upos, type = "upos")
+     phrases <- keywords_rake(tmp.df, 
+                              term = "lemma", 
+                              group = "doc_id",
+                              relevant = tmp.df$upos %in% c("NOUN", "ADJ")
+                              )
      phrases <- subset(phrases, ngram > 1 & freq > 3)
      phrases$key <- factor(phrases$keyword, levels = rev(phrases$keyword))
      rake.ls[[rake_counter]] <- data.frame(doc_id=rtmp,phrases,stringsAsFactors = FALSE)
@@ -139,6 +148,8 @@ adj.df  <-  adj.df[grep("[:print:]",adj.df$key),]
 verb.df <- verb.df[grep("[:print:]",verb.df$key),]
 rake.df <- rake.df[grep("[:print:]",rake.df$key),]
 # write_csv(noun.df,'../Tableau_input/noun.csv')
+
+
 
 write_csv(tr_final.df,'../Tableau_input/Readability.csv')
 write_csv(sentiment_final.df,'../Tableau_input/Sentiment.csv')

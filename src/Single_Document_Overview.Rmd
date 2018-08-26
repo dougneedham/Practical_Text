@@ -6,19 +6,30 @@ output: html_notebook
 
 Demonstration code for extracting metrics from PDF files. 
 
-This is for a single document, similar code will be used to process an entire directory. <br>
+This is for a single document, similar code will be used to process an entire directory.
 
-For more details on how this notebook works, please see [Practical_Text](http://bit.ly/Practical_Text_Blog){target="_blank"}
+For more details on how this notebook works, please see
+
+[Practical_Text](http://bit.ly/Practical_Text_Blog){target="_blank"}
 
 ```{r Load Packages}
 suppressPackageStartupMessages(library("ggplot2")) # For viz
 suppressPackageStartupMessages(library(pdftools))  # for reading PDF files
+# https://cran.r-project.org/web/packages/pdftools/index.html
 suppressPackageStartupMessages(library(lattice))   # for some graphics
 suppressPackageStartupMessages(library(quanteda))  # for text_readability 
 suppressPackageStartupMessages(library(syuzhet))   # For Sentiment 
 suppressPackageStartupMessages(library(tictoc))    # For Timing
 suppressPackageStartupMessages(library(udpipe))    # For nlp
+#https://cran.r-project.org/web/packages/udpipe/index.html
 
+
+```
+
+```{r Define a function for later use }
+ normalit<-function(m){
+   (m - min(m,na.rm=TRUE))/(max(m,na.rm=TRUE)-min(m,na.rm=TRUE))
+ }
 ```
 
 ```{r Read Data }
@@ -27,14 +38,14 @@ tic()
 filename <- '../PDF_Input/Calculus.pdf'
 text <- pdf_text(filename)
 
-udmodel_english <- udpipe_load_model(file = '../udpipe/english-ud-2.0-170801.udpipe')
+
 toc()
 ```
-```{r Define a function for later use }
- normalit<-function(m){
-   (m - min(m,na.rm=TRUE))/(max(m,na.rm=TRUE)-min(m,na.rm=TRUE))
- }
+```{r review Text}
+print(text[2])
+
 ```
+
 
 ```{r Make Sections}
 tic()
@@ -45,6 +56,11 @@ doc_id_text <- c(rep("Section 01",section_size),rep("Section 02",section_size) ,
 raw.df <- data.frame(doc_id=doc_id_text,raw_text=text,stringsAsFactors = FALSE)
 toc()
 ```
+```{r display data frame}
+names(raw.df)
+raw.df[c(3:5),]$raw_text
+
+```
 
 ```{r Create Readability Data Frame}
 tic()
@@ -54,6 +70,15 @@ spl <- strsplit(as.character(tr.df$document), "\\.")
 tr.df$section <- sapply(lapply(spl,head,-1),paste,collapse="\\.")
 tr.df$subsection <- sapply(lapply(spl,tail,-1),paste,collapse="\\.")
 toc()
+```
+```{r review readability metrics}
+names(tr.df)
+```
+
+
+```{r textstat_readability demo}
+inaugReadability <- textstat_readability(data_corpus_inaugural, "all")
+cor(inaugReadability[,-1])
 ```
 
 ```{r display boxplot for Readability Data Frame}
@@ -73,6 +98,8 @@ Sentiment <- get_nrc_sentiment(raw.df$raw_text)
 sentiment.df <- data.frame(section_id=doc_id_text,Sentiment,stringsAsFactors = FALSE)
 toc()
 ```
+
+
 ```{r Display Sentiment Data Frame}
 tic()
 #Transformation and  cleaning
@@ -83,7 +110,7 @@ names(td_Rowsum)[1] <- "count"
 td_Rowsum <- cbind("sentiment" = rownames(td_Rowsum), td_Rowsum)
 rownames(td_Rowsum) <- NULL
 td_Plot<-td_Rowsum[1:10,]
-levels(td_Plot$sentiment) <- c("anger","anticipation","disgust","fear","joy","sadness","surprise","trust","negative","positive" )
+levels(td_Plot$sentiment) <- c("Negative","Anger","Anticipation","Disgust","Fear","Joy","Sadness","Surprise","Trust","Positive" )
 
 qplot(sentiment, data=td_Plot, weight=count, geom="bar",fill=sentiment)+
   ggtitle("Doug's book Collection Overall sentiment analysis")
@@ -99,7 +126,7 @@ for(doc_id in sort(unique(sentiment.df$section_id))) {
   td_Rowsum <- cbind("sentiment" = rownames(td_Rowsum), td_Rowsum)
   rownames(td_Rowsum) <- NULL
   td_Plot<-td_Rowsum[1:10,]
-  levels(td_Plot$sentiment) <- c("anger","anticipation","disgust","fear","joy","sadness","surprise","trust","negative","positive" )
+  levels(td_Plot$sentiment) <-  c("Negative","Anger","Anticipation","Disgust","Fear","Joy","Sadness","Surprise","Trust","Positive" )
   print(qplot(sentiment, data=td_Plot, weight=count, geom="bar",fill=sentiment)+
   ggtitle(paste0("Doug's book Collection Overall sentiment analysis for ",doc_id)))
   
@@ -111,31 +138,49 @@ toc()
 
 
 ```{r Create Annotated Data Frame }
+udmodel_english <- udpipe_load_model(file = '../udpipe/english-ud-2.0-170801.udpipe')
+
 tic()
 ann.raw <- udpipe_annotate(udmodel_english,text,doc_id=paste(filename,doc_id_text,sep=" "))
 
 ann.df <- data.frame(ann.raw)
 toc()
 ```
+```{r demo annotation}
+demo.raw <- udpipe_annotate(udmodel_english,c("What is the average temperature?",
+                                          "Can you average those numbers?",
+                                          "What does the average say? ")
+                        
+)
+demo.df <- data.frame(demo.raw)
+
+#
+# Same word, different part of speech. 
+#
+
+demo.df[demo.df$token=="average",c(4,6,8)]
+demo.df[c(1:2),]
+```
+
+```{r as_phrasemachine demo}
+x <- c("PROPN", "SCONJ", "ADJ", "NOUN", "VERB", "INTJ", "DET", "VERB", 
+       "PROPN", "AUX", "NUM", "NUM", "X", "SCONJ", "PRON", "PUNCT", "ADP", 
+       "X", "PUNCT", "AUX", "PROPN", "ADP", "X", "PROPN", "ADP", "DET", 
+       "CCONJ", "INTJ", "NOUN", "PROPN")
+as_phrasemachine(x)
+
+
+```
 
 ```{r Display Word Frequencies}
 tic()
+
 tmp.df <- ann.df
 
-rake_keywords <- keywords_rake(tmp.df, 
-                               term = "lemma", 
-                               group = "doc_id",
-                               relevant = tmp.df$upos %in% c("NOUN", "ADJ")
-                               )
-rake_keywords$key <- factor(rake_keywords$keyword, levels = rev(rake_keywords$keyword))
-print(barchart(key ~ rake, 
-               data = head(subset(rake_keywords, freq > 3), 20), 
-               col = "blue", 
-               main = "Keywords identified by RAKE ",
-               xlab = "Rake"))
 
 tmp.df$phrase_tag <- as_phrasemachine(tmp.df$upos,
                                       type = "upos")
+
 phrases <- keywords_phrases(x = tmp.df$phrase_tag,
                             term = tmp.df$token, 
                             pattern = "(A|N)*N(P+D*(A|N)*N)*", 
@@ -147,7 +192,7 @@ phrases <- subset(phrases, ngram > 1 & freq > 3)
 phrases$key <- factor(phrases$keyword,
                       levels = rev(phrases$keyword))
 print(barchart(key ~ freq, 
-               data = head(phrases, 20), 
+               data = head(phrases[order(phrases$freq,decreasing = TRUE),],20), 
                col = "green", 
                main = "Keywords - simple noun phrases ", 
                xlab = "Frequency keywords"))
@@ -155,18 +200,6 @@ print(barchart(key ~ freq,
 
 for(doc in unique(ann.df$doc_id)) { 
   tmp.df <- ann.df[ann.df$doc_id==doc,]
-  rake_keywords <- keywords_rake(tmp.df , 
-                                 term = "lemma", 
-                                 group = "doc_id", 
-                                 relevant = tmp.df$upos %in% c("NOUN", "ADJ")
-                                 )
-  rake_keywords$key <- factor(rake_keywords$keyword, levels = rev(rake_keywords$keyword))
-  print(barchart(key ~ rake, 
-                 data = head(subset(rake_keywords, freq > 3), 20), 
-                 col = "blue", 
-                 main = paste0("Keywords identified by RAKE ",doc), 
-                 xlab = "Rake Keyword"))
-  
   tmp.df$phrase_tag <- as_phrasemachine(tmp.df$upos, type = "upos")
   phrases <- keywords_phrases(x = tmp.df$phrase_tag, 
                               term = tmp.df$token, 
@@ -176,11 +209,47 @@ for(doc in unique(ann.df$doc_id)) {
   phrases <- subset(phrases, ngram > 1 & freq > 3)
   phrases$key <- factor(phrases$keyword, levels = rev(phrases$keyword))
   print(barchart(key ~ freq, 
-                 data = head(phrases, 20), 
+                 data = head(phrases[order(phrases$freq,decreasing = TRUE),],20), 
                  col = "Green", 
                  main = paste0("Keywords - simple noun phrases ",doc), 
                  xlab = "Frequency"))
 }
+
+
 toc()
+```
+
+```{r RAKE automatically find keywords}
+
+tmp.df <- ann.df
+
+rake_keywords <- keywords_rake(tmp.df, 
+                               term = "lemma", 
+                               group = "doc_id",
+                               relevant = tmp.df$upos %in% c("NOUN", "ADJ")
+                               )
+rake_keywords$key <- factor(rake_keywords$keyword, levels = rev(rake_keywords$keyword))
+
+rake_keywords <- subset(rake_keywords, ngram > 1 & freq > 3)
+print(barchart(key ~ rake, 
+               data = head(rake_keywords[order(rake_keywords$freq,decreasing = TRUE),], 20), 
+               col = "blue", 
+               main = "Keywords identified by RAKE ",
+               xlab = "Rake"))
+for(doc in unique(ann.df$doc_id)) { 
+  tmp.df <- ann.df[ann.df$doc_id==doc,]
+  rake_keywords <- keywords_rake(tmp.df , 
+                                 term = "lemma", 
+                                 group = "doc_id", 
+                                 relevant = tmp.df$upos %in% c("NOUN", "ADJ")
+                                 )
+  rake_keywords$key <- factor(rake_keywords$keyword, levels = rev(rake_keywords$keyword))
+  rake_keywords <- subset(rake_keywords,ngram > 1 & freq > 3)
+  print(barchart(key ~ rake, 
+                 data = head(rake_keywords[order(rake_keywords$freq,decreasing = TRUE),], 20), 
+                 col = "blue", 
+                 main = paste0("Keywords identified by RAKE ",doc), 
+                 xlab = "Rake Keyword"))
+}
 ```
 
